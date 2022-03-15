@@ -15,18 +15,18 @@ library(DESeq2)
 
 ###############################################data##################################
 
-setwd("directory_where_files_are_stored")
+setwd("directorywherefilesarestored")
 
-my_data    = read.table("file_name", header = T)
-annotation = read.table("file_name", header = T) %>% 
+data       = read.table("data.txt", header = T)
+annotation = read.table("metadata.txt", header = T) %>% 
              mutate(sumsa = tcells/AOISurfaceArea)
 
-data.orig = my_data %>% 
+data.orig = data %>% 
             dplyr::filter(Type == "Original") %>% 
             dplyr::select(ROI, TargetName, ProbeDisplayName, AnalyteType, Count) %>% 
             tidyr::pivot_wider(names_from = ROI, values_from = Count)
 
-data.rep = my_data %>% 
+data.rep = data %>% 
            dplyr::filter(Type == "Replicate") %>% 
            dplyr::select(ROI, TargetName, ProbeDisplayName, AnalyteType, Count) %>% 
            tidyr::pivot_wider(names_from = ROI, values_from = Count)
@@ -128,26 +128,26 @@ colnames(low.reads.rep) = c("ProbeDisplayName", "low_reads")
 #It is only recommended to run the global outlier test on datasets with 24 or more ROIs/segments.
 #take geometric mean for all targets of one gene over all ROIs.
 
-geomean.global.orig = my_data %>% 
+geomean.global.orig = data %>% 
                       filter(Type == "Original") %>% 
                       group_by(TargetName) %>% 
                       summarise(geomean_global = gm_mean(Count))
 
 
-geomean.global.rep = my_data %>% 
+geomean.global.rep = data %>% 
                      filter(Type == "Replicate") %>% 
                      group_by(TargetName) %>% 
                      summarise(geomean_global = gm_mean(Count))
 
 #take the geometric mean for one target over all ROIs
 
-geomean.local.orig = my_data %>% 
+geomean.local.orig = data %>% 
                      filter(Type == "Original") %>% 
                      group_by(TargetName, ProbeDisplayName) %>% 
                      summarise(geomean_local = gm_mean(Count))
 
 
-geomean.local.rep = my_data %>% 
+geomean.local.rep = data %>% 
                     dplyr::filter(Type == "Replicate") %>% 
                     dplyr::group_by(TargetName, ProbeDisplayName) %>% 
                     dplyr::summarise(geomean_local = gm_mean(Count))
@@ -171,7 +171,7 @@ GO.result.rep      = geomean.global.rep %>%
 #Note! some Grubbs test result in 0, these are to be excluded due to an error
 
 
-grubbstest.orig = my_data %>% 
+grubbstest.orig = data %>% 
                   filter(Type == "Original") %>% 
                   dplyr::select(TargetName, ProbeDisplayName, ROI, Count) %>% 
                   group_by(TargetName, ROI) %>%
@@ -181,7 +181,7 @@ grubbstest.orig = my_data %>%
                          test          = ifelse(grubbstest == 0, yes = NA, no = grubbstest),
                          grubbsoutlier = Count == outlier & test <.05)
 
-grubbstest.rep = my_data %>% 
+grubbstest.rep = data %>% 
                  dplyr::filter(Type == "Replicate") %>% 
                  dplyr::select(TargetName, ProbeDisplayName, ROI, Count) %>% 
                  group_by(TargetName, ROI) %>%
@@ -228,7 +228,6 @@ filter.reads.orig   = QC_reads.orig %>% dplyr::filter(low_reads == F |
 #ROIs replicate experiment
 
 filter.ROIs.rep    = QC_ROI_rep %>% dplyr::filter(readnumber     == F | 
-                                                  alligned_reads == F | 
                                                   seqsat         == F | 
                                                   Nucleicount    == F | 
                                                   SurfaceArea    == F | 
@@ -242,12 +241,12 @@ filter.reads.rep   = QC_reads.rep %>% dplyr::filter(low_reads == F |
 
 #filter data
 
-fil.data.orig = my_data %>% 
+fil.data.orig = data %>% 
                 filter(Type == "Original") %>% 
                 filter(!ProbeDisplayName %in% filter.reads.orig$ProbeDisplayName) %>% 
                 filter(!ROI              %in% rownames(filter.ROIs.orig))
 
-fil.data.rep  = my_data %>%
+fil.data.rep  = data %>%
                 filter(Type == "Replicate") %>% 
                 filter(!ProbeDisplayName %in% filter.reads.rep$ProbeDisplayName) %>% 
                 filter(!ROI              %in% rownames(filter.ROIs.rep))
@@ -331,6 +330,9 @@ CPMnorm.orig = t(t(LOQ.res.orig)/colSums(LOQ.res.orig))*1e4
 
 quartiles.raw.orig   = apply(LOQ.res.orig, 2, function(x) quantile(x, 0.75, na.rm=T)); quartiles.raw.orig  = mean(quartiles.raw.orig)/quartiles.raw.orig
 norm.quartiles.orig  = t(t(LOQ.res.orig)*quartiles.raw.orig)
+
+quartiles.raw.rep   = apply(LOQ.res.rep, 2, function(x) quantile(x, 0.75, na.rm=T)); quartiles.raw.rep  = mean(quartiles.raw.rep)/quartiles.raw.rep
+norm.quartiles.rep  = t(t(LOQ.res.rep)*quartiles.raw.rep)
 
 #######################################Normalization according to DESeq2######################
 
